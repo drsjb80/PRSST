@@ -4,16 +4,37 @@ import webbrowser
 import queue
 import threading
 import feedparser
+# import pprint
+import yaml
+from tkfontchooser import askfont
 
 delay = 10000
 growright = False
 currentURL = ''
 q = queue.SimpleQueue()
 
+feeds = ['https://portswigger.net/daily-swig/rss', \
+    'http://feeds.denverpost.com/dp-news-breaking', \
+    'https://www.nws.noaa.gov/data/current_obs/KDEN.rss', \
+    'http://newsrss.bbc.co.uk/rss/newsonline_uk_edition/world/rss.xml', \
+    'http://rss.cnn.com/rss/cnn_topstories.rss', \
+    'http://www.us-cert.gov/channels/cas.rdf']
+
+config = {'feeds': feeds}
+
+def openbrowser(event):
+    webbrowser.open(currentURL)
+
 root = tkinter.Tk()
 root.title('DRSST')
 labelvar = tkinter.StringVar()
 labelvar.set('Initializing')
+
+label = ttk.Label(root, textvariable=labelvar)
+ttk.Style().configure("TLabel", padding=4)
+label.bind("<Button-1>", openbrowser)
+label.pack()
+# pprint.pprint(label.config())
 
 # import urllib.request
 # import base64
@@ -23,12 +44,26 @@ labelvar.set('Initializing')
 # img = ImageTk.PhotoImage(im)
 # label = ttk.Label(root, image=img, textvariable=labelvar)
 
-def openbrowser(event):
-    webbrowser.open(currentURL)
+def setfont():
+    font = askfont(root)
+    if font:
+        font['family'] = font['family'].replace(' ', '\ ')
+        font_str = "%(family)s %(size)i %(weight)s %(slant)s" % font
+        if font['underline']:
+            font_str += ' underline'
+        if font['overstrike']:
+            font_str += ' overstrike'
+        label.configure(font=font_str)
+        config['font'] = font_str
+        # with file('prsst.yml', 'w') as stream:
+            # yaml.dump(config, stream)
+        print(yaml.dump(config))
 
-label = ttk.Label(root, textvariable=labelvar)
-label.bind("<Button-1>", openbrowser)
-label.pack()
+menubar = tkinter.Menu(root)
+settings = tkinter.Menu(menubar, tearoff=0)
+settings.add_command(label="Font", command=setfont)
+menubar.add_cascade(label="Settings", menu=settings)
+root.config(menu=menubar)
 
 class FetchThread(threading.Thread):
     def __init__(self, URL):
@@ -37,15 +72,30 @@ class FetchThread(threading.Thread):
 
     def run(self):
         print('fetching', self.URL)
-        f = feedparser.parse(self.URL)
-        print('done fetching', self.URL)
+        try:
+            f = feedparser.parse(self.URL)
+        except AttributeError:
+            print("Couldn't fetch", self.URL)
+            return
 
-        # get everything in safely
+        # get everything in safely so there's no interleaving
         with threading.Lock():
-            print("i'm a title", f.feed.title)
             q.put({"i'm a title":f.feed.title})
             for entry in f.entries:
                 q.put(entry)
+
+def reload():
+    global q
+    print('reloading')
+    with threading.Lock():
+        q = queue.SimpleQueue()
+        # for feed in config['feeds']:
+        for feed in feeds:
+            FetchThread(feed).start()
+
+    t = threading.Timer(30 * 60, reload)
+    t.daemon = True
+    t.start()
 
 # bleah
 # https://stackoverflow.com/questions/26703502/threads-and-tkinter
@@ -65,6 +115,8 @@ def infinite_process():
             continue
 
         labelvar.set(entry.title)
+        # apparently need this if window moved.
+        root.update()
         currentURL = entry.link
         root.update()
         if growright:
@@ -81,16 +133,7 @@ def infinite_process():
     # it appears this doesn't increase the stack size...
     root.after(delay, infinite_process)
 
-feeds = ['https://portswigger.net/daily-swig/rss', \
-    'http://feeds.denverpost.com/dp-news-breaking', \
-    'https://www.nws.noaa.gov/data/current_obs/KDEN.rss', \
-    'http://newsrss.bbc.co.uk/rss/newsonline_uk_edition/world/rss.xml', \
-    'http://rss.cnn.com/rss/cnn_topstories.rss', \
-    'http://www.us-cert.gov/channels/cas.rdf']
-
-for feed in feeds:
-    FetchThread(feed).start()
-
+reload()
 root.after(1, infinite_process)
 root.mainloop()
 
