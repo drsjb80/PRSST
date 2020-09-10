@@ -8,12 +8,17 @@ import feedparser
 import yaml
 from tkfontchooser import askfont
 
+# https://programmingideaswithjake.wordpress.com/2016/05/07/object-literals-in-python/
+class Object:
+   def __init__(self, **attributes):
+      self.__dict__.update(attributes)
+
 delay = 10000
 growright = False
 currentURL = ''
 q = queue.SimpleQueue()
 
-feeds = ['https://portswigger.net/daily-swig/rss', \
+feeds = ['noworky', 'https://portswigger.net/daily-swig/rss', \
     'http://feeds.denverpost.com/dp-news-breaking', \
     'https://www.nws.noaa.gov/data/current_obs/KDEN.rss', \
     'http://newsrss.bbc.co.uk/rss/newsonline_uk_edition/world/rss.xml', \
@@ -26,9 +31,9 @@ def openbrowser(event):
     webbrowser.open(currentURL)
 
 root = tkinter.Tk()
-root.title('DRSST')
+# root.title('DRSST')
 labelvar = tkinter.StringVar()
-labelvar.set('Initializing')
+# labelvar.set('Initializing')
 
 label = ttk.Label(root, textvariable=labelvar)
 ttk.Style().configure("TLabel", padding=4)
@@ -70,12 +75,12 @@ class FetchThread(threading.Thread):
         self.URL = URL
 
     def run(self):
-        print('fetching', self.URL)
-        try:
-            f = feedparser.parse(self.URL)
-        except AttributeError:
-            print("Couldn't fetch", self.URL)
-            return
+        f = feedparser.parse(self.URL)
+        if not f.feed:
+            f.feed.title = 'Error'
+            # this is a hack so i don't have to create objects
+            f.entries = [{'title':('Unable to load %s') % self.URL, \
+                'link':'http://www.example.com'}]
 
         # get everything in safely so there's no interleaving
         with threading.Lock():
@@ -85,11 +90,10 @@ class FetchThread(threading.Thread):
 
 def reload():
     global q
-    print('reloading')
     with threading.Lock():
         q = queue.SimpleQueue()
-        # for feed in config['feeds']:
-        for feed in feeds:
+        # for feed in feeds:
+        for feed in config['feeds']:
             FetchThread(feed).start()
 
     t = threading.Timer(30 * 60, reload)
@@ -113,10 +117,11 @@ def infinite_process():
             root.update()
             continue
 
-        labelvar.set(entry.title)
+        # use dictionary syntax so error messages are easily created
+        labelvar.set(entry['title'])
         # apparently need this if window moved.
         root.update()
-        currentURL = entry.link
+        currentURL = entry['link']
         root.update()
         if growright:
             # not my favorite approach but i don't yet know how to grow
@@ -137,3 +142,7 @@ root.after(1, infinite_process)
 root.mainloop()
 
 # https://stackoverflow.com/questions/47127585/tkinter-grow-frame-to-fit-content
+
+# 4360 rewrite
+# FCAR decision/rewrite
+# agenda and decisions made documents
