@@ -55,9 +55,8 @@ def setfont():
             font_str += ' overstrike'
         label.configure(font=font_str)
         config['font'] = font_str
-        # with file('prsst.yml', 'w') as stream:
-            # yaml.dump(config, stream)
-        print(yaml.dump(config))
+        with open('prsst.yml', 'w') as f:
+            yaml.dump(config, f)
 
 menubar = tkinter.Menu(root)
 settings = tkinter.Menu(menubar, tearoff=0)
