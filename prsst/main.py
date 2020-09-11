@@ -13,10 +13,10 @@ class Object:
    def __init__(self, **attributes):
       self.__dict__.update(attributes)
 
-delay = 10000
+delay = 10000   # move to config
 growright = False
 currentURL = ''
-q = queue.SimpleQueue()
+q = None
 
 feeds = ['noworky', 'https://portswigger.net/daily-swig/rss', \
     'http://feeds.denverpost.com/dp-news-breaking', \
@@ -25,7 +25,6 @@ feeds = ['noworky', 'https://portswigger.net/daily-swig/rss', \
     'http://rss.cnn.com/rss/cnn_topstories.rss', \
     'http://www.us-cert.gov/channels/cas.rdf']
 
-config = {'feeds': feeds}
 
 def openbrowser(event):
     webbrowser.open(currentURL)
@@ -40,6 +39,13 @@ ttk.Style().configure("TLabel", padding=4)
 label.bind("<Button-1>", openbrowser)
 label.pack()
 # pprint.pprint(label.config())
+
+with open('prsst.yml', 'r') as f:
+    config = yaml.safe_load(f)
+    if 'font' in config:
+        label.configure(font=config['font'])
+    if 'feeds' not in config:
+        config['feeds'] = ['http://feeds.rssboard.org/rssboard']
 
 # import urllib.request
 # import base64
