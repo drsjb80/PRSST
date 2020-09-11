@@ -1,0 +1,8 @@
+feeds:
+- https://portswigger.net/daily-swig/rss
+- http://feeds.denverpost.com/dp-news-breaking
+- https://www.nws.noaa.gov/data/current_obs/KDEN.rss
+- http://newsrss.bbc.co.uk/rss/newsonline_uk_edition/world/rss.xml
+- http://rss.cnn.com/rss/cnn_topstories.rss
+- http://www.us-cert.gov/channels/cas.rdf
+font: Helvetica 14 normal roman
