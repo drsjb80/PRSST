@@ -13,47 +13,54 @@ class Object:
    def __init__(self, **attributes):
       self.__dict__.update(attributes)
 
-delay = 10000   # move to config
-growright = False
 currentURL = ''
 q = None
+config = {}
+root = None
+label = None
+labelvar = None
+growright = False
 
-feeds = ['noworky', 'https://portswigger.net/daily-swig/rss', \
-    'http://feeds.denverpost.com/dp-news-breaking', \
-    'https://www.nws.noaa.gov/data/current_obs/KDEN.rss', \
-    'http://newsrss.bbc.co.uk/rss/newsonline_uk_edition/world/rss.xml', \
-    'http://rss.cnn.com/rss/cnn_topstories.rss', \
-    'http://www.us-cert.gov/channels/cas.rdf']
-
-
+# make into a lambda
 def openbrowser(event):
     webbrowser.open(currentURL)
 
-root = tkinter.Tk()
-# root.title('DRSST')
-labelvar = tkinter.StringVar()
-# labelvar.set('Initializing')
+def initialize():
+    global root
+    global label
+    global labelvar
+    root = tkinter.Tk()
+    root.title('DRSST')
+    labelvar = tkinter.StringVar()
+    labelvar.set('Initializing')
+    label = ttk.Label(root, textvariable=labelvar)
+    ttk.Style().configure("TLabel", padding=4)
+    label.bind("<Button-1>", openbrowser)
+    label.pack()
 
-label = ttk.Label(root, textvariable=labelvar)
-ttk.Style().configure("TLabel", padding=4)
-label.bind("<Button-1>", openbrowser)
-label.pack()
-# pprint.pprint(label.config())
+    menubar = tkinter.Menu(root)
+    settings = tkinter.Menu(menubar, tearoff=0)
+    settings.add_command(label="Font", command=setfont)
+    menubar.add_cascade(label="Settings", menu=settings)
+    root.config(menu=menubar)
 
-with open('prsst.yml', 'r') as f:
-    config = yaml.safe_load(f)
-    if 'font' in config:
-        label.configure(font=config['font'])
-    if 'feeds' not in config:
-        config['feeds'] = ['http://feeds.rssboard.org/rssboard']
-
-# import urllib.request
-# import base64
-# url = 'https://portswigger.net/daily-swig/rss/icon'
-# raw_data = urllib.request.urlopen(url).read()
-# im = Image.open(io.BytesIO(raw_data))
-# img = ImageTk.PhotoImage(im)
-# label = ttk.Label(root, image=img, textvariable=labelvar)
+def readconfig():
+    global label
+    global config
+    global growright
+    try:
+        with open('prsst.yml', 'r') as f:
+            config = yaml.safe_load(f)
+            if 'font' in config:
+                label.configure(font=config['font'])
+            if 'feeds' not in config:
+                config['feeds'] = ['http://feeds.rssboard.org/rssboard']
+            if 'growright' not in config:
+                config['growright'] = False
+            if 'delay' not in config:
+                config['delay'] = 10000
+    except FileNotFoundError as FNFE:
+        config = {'feeds': ['http://feeds.rssboard.org/rssboard']}
 
 def setfont():
     font = askfont(root)
@@ -69,11 +76,14 @@ def setfont():
         with open('prsst.yml', 'w') as f:
             yaml.dump(config, f)
 
-menubar = tkinter.Menu(root)
-settings = tkinter.Menu(menubar, tearoff=0)
-settings.add_command(label="Font", command=setfont)
-menubar.add_cascade(label="Settings", menu=settings)
-root.config(menu=menubar)
+
+# import urllib.request
+# import base64
+# url = 'https://portswigger.net/daily-swig/rss/icon'
+# raw_data = urllib.request.urlopen(url).read()
+# im = Image.open(io.BytesIO(raw_data))
+# img = ImageTk.PhotoImage(im)
+# label = ttk.Label(root, image=img, textvariable=labelvar)
 
 class FetchThread(threading.Thread):
     def __init__(self, URL):
@@ -82,7 +92,8 @@ class FetchThread(threading.Thread):
 
     def run(self):
         f = feedparser.parse(self.URL)
-        if not f.feed:
+        if not f.feed or not f.feed['title']:
+            print('error fetching', self.URL)
             f.feed.title = 'Error'
             # this is a hack so i don't have to create objects
             f.entries = [{'title':('Unable to load %s') % self.URL, \
@@ -111,6 +122,7 @@ def reload():
 def infinite_process():
     global currentURL
     global q
+    global labelvar
 
     while True:
         with threading.Lock():
@@ -141,8 +153,10 @@ def infinite_process():
         break
 
     # it appears this doesn't increase the stack size...
-    root.after(delay, infinite_process)
+    root.after(config['delay'], infinite_process)
 
+initialize()
+readconfig()
 reload()
 root.after(1, infinite_process)
 root.mainloop()
