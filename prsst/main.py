@@ -92,21 +92,19 @@ class FetchThread(threading.Thread):
 
     def run(self):
         f = feedparser.parse(self.URL)
-        if not f.feed:
-            print('error fetching', self.URL)
-            f.feed['title'] = 'Error'
+        try:
+            f.feed
+            f.feed.title
+        except:
+            print('error fetching feed', self.URL)
+            f.feed.title = 'Error'
             # this is a hack so i don't have to create objects
             f.entries = [{'title':('Unable to load %s') % self.URL, \
                 'link':'http://www.example.com'}]
 
-        try:
-            print(f.feed.title)
-        except:
-            print('fuck: ', self.URL)
-
         # get everything in safely so there's no interleaving
         with threading.Lock():
-            q.put({"i'm a title":f.feed['title']})
+            q.put({"i'm a title":f.feed.title})
             for entry in f.entries:
                 q.put(entry)
 

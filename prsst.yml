@@ -18,11 +18,10 @@ feeds:
 - https://www.netresec.com/rss.ashx
 - https://nakedsecurity.sophos.com/category/apple/feed/
 - https://www.intego.com/mac-security-blog/feed/
-- http://grammar.quickanddirtytips.com/PodcastsRss.ashx?PodCast=grammar
 - https://feeds.feedburner.com/GoogleOnlineSecurityBlog
 - https://feeds.feedburner.com/NakedSecurity
 - https://what-if.xkcd.com/feed.atom
-- https://threatpost.com/en_us/rss.xml
+- https://threatpost.com/feed/
 - https://isc.sans.edu/rssfeed.xml
 - https://feeds2.feedburner.com/inkophile
 - https://www.darkreading.com/rss/all.xml
