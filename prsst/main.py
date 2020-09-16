@@ -4,8 +4,8 @@ import webbrowser
 import queue
 import threading
 import feedparser
-# import pprint
 import yaml
+import html
 from tkfontchooser import askfont
 
 # https://programmingideaswithjake.wordpress.com/2016/05/07/object-literals-in-python/
@@ -59,6 +59,8 @@ def readconfig():
                 config['growright'] = False
             if 'delay' not in config:
                 config['delay'] = 10000
+            if 'reload' not in config:
+                config['reload'] = 60
     except FileNotFoundError as FNFE:
         config = {'feeds': ['http://feeds.rssboard.org/rssboard']}
 
@@ -112,13 +114,9 @@ def reload():
     global q
     with threading.Lock():
         q = queue.SimpleQueue()
-        # for feed in feeds:
         for feed in config['feeds']:
             FetchThread(feed).start()
 
-    t = threading.Timer(30 * 60, reload)
-    t.daemon = True
-    t.start()
 
 # bleah
 # https://stackoverflow.com/questions/26703502/threads-and-tkinter
@@ -134,12 +132,12 @@ def infinite_process():
 
         # find a better way to do this.
         if "i'm a title" in entry.keys():
-            root.title(entry["i'm a title"])
+            root.title(html.unescape(entry["i'm a title"]))
             root.update()
             continue
 
         # use dictionary syntax so error messages are easily created
-        labelvar.set(entry['title'])
+        labelvar.set(html.unescape(entry['title']))
         # apparently need this if window moved.
         root.update()
         currentURL = entry['link']
@@ -160,6 +158,11 @@ def infinite_process():
 
 initialize()
 readconfig()
+
+t = threading.Timer(config['reload'] * 60, reload)
+t.daemon = True
+t.start()
+
 reload()
 root.after(1, infinite_process)
 root.mainloop()
