@@ -126,16 +126,7 @@ class Reload(threading.Thread):
         while True:
             # the second and subsequent times
             if q != None:
-                # reload is in minutes
-                have = config['reload']
-
-                # delay is in seconds 
-                need = config['delay'] * q.qsize() / 60
-                
-                if have < need:
-                    print('reload was', config['reload'])
-                    config['reload'] = need + 10
-                    print('reload is', config['reload'])
+                config['reload'] = (config['delay'] * q.qsize() / 60) + 2
 
             with threading.Lock():
                 q = queue.SimpleQueue()
