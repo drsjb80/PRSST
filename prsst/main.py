@@ -1,3 +1,4 @@
+import argparse
 import tkinter
 import time
 import webbrowser
@@ -6,9 +7,11 @@ import threading
 import feedparser
 import yaml
 import html
+import re
 from os import path
 from tkfontchooser import askfont
 from pathlib import Path
+
 
 # https://programmingideaswithjake.wordpress.com/2016/05/07/object-literals-in-python/
 class Object:
@@ -21,6 +24,13 @@ root = tkinter.Tk()
 labelvar = tkinter.StringVar()
 label = tkinter.ttk.Label(root, textvariable=labelvar)
 growright = False
+
+parser = argparse.ArgumentParser()
+parser.add_argument('-f', '--feed', help="specify feed directly", \
+    action='append')
+parser.add_argument('-y', '--yaml', help="specify YAML file", \
+    action='append')
+args = parser.parse_args()
 
 # make into a lambda
 def openbrowser(event):
@@ -55,17 +65,17 @@ def setdefaults(config, label):
 
 def readconfig(label):
     config = {}
+    if args.feed:
+        config['feeds'] = args.feed
 
-    # probably time to put in a command line option for this.
-    # i'm assuming 3.5 or better, and 3.5 is already EOL:
-    # https://devguide.python.org/#status-of-python-branches
-    p = Path(str(Path.home()) + '/.prsst.yml')
+    if args.yaml:
+        for y in args.yaml:
+            with Path(y).open() as f:
+                config.update(yaml.safe_load(f))
 
-    if not p.exists():
-        p = Path('prsst.yml')
-
-    with p.open() as f:
-        config = yaml.safe_load(f)
+    if args.feed is None and args.yaml is None:
+        with Path(str(Path.home()) + '/.prsst.yml').open() as f:
+            config.update(yaml.safe_load(f))
 
     setdefaults(config, label)
     return config
@@ -152,7 +162,7 @@ def infinite_process():
             continue
 
         # use dictionary syntax so error messages are easily created
-        labelvar.set(html.unescape(entry['title']))
+        labelvar.set(re.sub('<[^<>]+?>', '', entry['title']))
 
         global currentURL
         currentURL = entry['link']
