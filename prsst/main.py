@@ -4,14 +4,12 @@ import time
 import webbrowser
 import queue
 import threading
-import feedparser
-import yaml
 import html
 import re
-from os import path
-from tkfontchooser import askfont
 from pathlib import Path
-
+import feedparser
+import yaml
+from tkfontchooser import askfont
 
 # https://programmingideaswithjake.wordpress.com/2016/05/07/object-literals-in-python/
 class Object:
@@ -19,11 +17,12 @@ class Object:
         self.__dict__.update(attributes)
 
 currentURL = ''
-q = None
+global_queue = None
 root = tkinter.Tk()
 labelvar = tkinter.StringVar()
 label = tkinter.ttk.Label(root, textvariable=labelvar)
 growright = False
+config = {}
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-f', '--feed', help="specify feed directly", \
@@ -34,10 +33,10 @@ args = parser.parse_args()
 
 # make into a lambda
 def openbrowser(event):
-    global currentURL
+    # global currentURL
     webbrowser.open(currentURL)
 
-def initialize(root, label, labelvar):
+def initialize():
     root.title('DRSST')
     labelvar.set('Initializing')
 
@@ -51,7 +50,7 @@ def initialize(root, label, labelvar):
     menubar.add_cascade(label="Settings", menu=settings)
     root.config(menu=menubar)
 
-def setdefaults(config, label):
+def setdefaults():
     if 'font' in config:
         label.configure(font=config['font'])
     if 'feeds' not in config:
@@ -63,21 +62,20 @@ def setdefaults(config, label):
     if 'reload' not in config:
         config['reload'] = 120
 
-def readconfig(label):
-    config = {}
+def readconfig():
     if args.feed:
         config['feeds'] = args.feed
 
     if args.yaml:
-        for y in args.yaml:
-            with Path(y).open() as f:
-                config.update(yaml.safe_load(f))
+        for ayaml in args.yaml:
+            with Path(ayaml).open() as afile:
+                config.update(yaml.safe_load(afile))
 
     if args.feed is None and args.yaml is None:
-        with Path(str(Path.home()) + '/.prsst.yml').open() as f:
-            config.update(yaml.safe_load(f))
+        with Path(str(Path.home()) + '/.prsst.yml').open() as afile:
+            config.update(yaml.safe_load(afile))
 
-    setdefaults(config, label)
+    setdefaults()
     return config
 
 def setfont():
@@ -92,8 +90,8 @@ def setfont():
         label.configure(font=font_str)
         config['font'] = font_str
 
-        with open('prsst.yml', 'w') as f:
-            yaml.dump(config, f)
+        with open('prsst.yml', 'w') as afile:
+            yaml.dump(config, afile)
 
 
 # import urllib.request
@@ -105,45 +103,43 @@ def setfont():
 # label = ttk.Label(root, image=img, textvariable=labelvar)
 
 class FetchThread(threading.Thread):
-    def __init__(self, URL):
+    def __init__(self, url):
         super().__init__()
-        self.URL = URL
+        self.url = url
 
     def run(self):
-        f = feedparser.parse(self.URL)
-        try:
-            f.feed
-            f.feed.title
-        except:
-            print('error fetching feed', self.URL)
-            f.feed.title = 'Error'
+        afeed = feedparser.parse(self.url)
+        if afeed.feed is None or afeed.feed.title is None:
+            print('error fetching feed', self.url)
+            afeed.feed.title = 'Error'
             # this is a hack so i don't have to create objects
-            f.entries = [{'title':('Unable to load %s') % self.URL, \
+            afeed.entries = [{'title':('Unable to load %s') % self.url, \
                 'link':'http://www.example.com'}]
 
         # get everything in safely so there's no interleaving
         with threading.Lock():
-            q.put({"i'm a title":f.feed.title})
-            for entry in f.entries:
-                q.put(entry)
+            global_queue.put({"i'm a title":afeed.feed.title})
+            for entry in afeed.entries:
+                global_queue.put(entry)
 
 class Reload(threading.Thread):
     def __init__(self):
         super().__init__()
-        
+
     def run(self):
-        global q
         while True:
+            global global_queue
+
             # the second and subsequent times
-            if q != None:
-                config['reload'] = (config['delay'] * q.qsize() / 60) + 2
+            if global_queue is not None:
+                config['reload'] = (config['delay'] * global_queue.qsize() / 60) + 2
 
             with threading.Lock():
-                q = queue.SimpleQueue()
+                global_queue = queue.SimpleQueue()
                 for feed in config['feeds']:
-                    t = FetchThread(feed)
-                    t.daemon = True
-                    t.start()
+                    fetch_thread = FetchThread(feed)
+                    fetch_thread.daemon = True
+                    fetch_thread.start()
 
             time.sleep(config['reload'] * 60)
 
@@ -152,8 +148,8 @@ class Reload(threading.Thread):
 def infinite_process():
     while True:
         with threading.Lock():
-            entry = q.get()
-            q.put(entry)
+            entry = global_queue.get()
+            global_queue.put(entry)
 
         # find a better way to do this.
         if "i'm a title" in entry.keys():
@@ -183,18 +179,14 @@ def infinite_process():
     # it appears this doesn't increase the stack size...
     root.after(config['delay'] * 1000, infinite_process)
 
-initialize(root, label, labelvar)
-config = readconfig(label)
+initialize()
+readconfig()
 
-t = Reload()
-t.daemon = True
-t.start()
+mainThread = Reload()
+mainThread.daemon = True
+mainThread.start()
 
 root.after(1, infinite_process)
 root.mainloop()
 
 # https://stackoverflow.com/questions/47127585/tkinter-grow-frame-to-fit-content
-
-# 4360 rewrite
-# FCAR decision/rewrite
-# agenda and decisions made documents
