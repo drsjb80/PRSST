@@ -24,6 +24,8 @@ label = tkinter.ttk.Label(root, textvariable=labelvar)
 growright = False
 config = {}
 
+TITLE_KEY = "i'm a title"
+
 parser = argparse.ArgumentParser()
 parser.add_argument('-f', '--feed', help="specify feed directly", \
     action='append')
@@ -33,7 +35,6 @@ args = parser.parse_args()
 
 # make into a lambda
 def openbrowser(event):
-    # global currentURL
     webbrowser.open(currentURL)
 
 def initialize():
@@ -93,15 +94,6 @@ def setfont():
         with open('prsst.yml', 'w') as afile:
             yaml.dump(config, afile)
 
-
-# import urllib.request
-# import base64
-# url = 'https://portswigger.net/daily-swig/rss/icon'
-# raw_data = urllib.request.urlopen(url).read()
-# im = Image.open(io.BytesIO(raw_data))
-# img = ImageTk.PhotoImage(im)
-# label = ttk.Label(root, image=img, textvariable=labelvar)
-
 class FetchThread(threading.Thread):
     def __init__(self, url):
         super().__init__()
@@ -114,11 +106,11 @@ class FetchThread(threading.Thread):
             afeed.feed.title = 'Error'
             # this is a hack so i don't have to create objects
             afeed.entries = [{'title':('Unable to load %s') % self.url, \
-                'link':'http://www.example.com'}]
+                'link':'https://www.example.com'}]
 
         # get everything in safely so there's no interleaving
         with threading.Lock():
-            global_queue.put({"i'm a title":afeed.feed.title})
+            global_queue.put({TITLE_KEY:afeed.feed.title})
             for entry in afeed.entries:
                 global_queue.put(entry)
 
@@ -152,8 +144,8 @@ def infinite_process():
             global_queue.put(entry)
 
         # find a better way to do this.
-        if "i'm a title" in entry.keys():
-            root.title(html.unescape(entry["i'm a title"]))
+        if TITLE_KEY in entry.keys():
+            root.title(html.unescape(entry[TITLE_KEY]))
             root.update()
             continue
 

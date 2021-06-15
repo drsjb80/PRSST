@@ -11,3 +11,12 @@ https://stackoverflow.com/questions/17746817/how-to-read-the-inputline-by-line-f
 https://docs.python.org/3/library/tkinter.scrolledtext.html#module-tkinter.scrolledtext
 
 http://effbot.org/tkinterbook/toplevel.htm
+
+import urllib.request
+import base64
+url = 'https://portswigger.net/daily-swig/rss/icon'
+raw_data = urllib.request.urlopen(url).read()
+im = Image.open(io.BytesIO(raw_data))
+img = ImageTk.PhotoImage(im)
+label = ttk.Label(root, image=img, textvariable=labelvar)
+
