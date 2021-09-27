@@ -150,7 +150,9 @@ def infinite_process():
             continue
 
         # use dictionary syntax so error messages are easily created
-        labelvar.set(re.sub('<[^<>]+?>', '', entry['title']))
+        text = re.sub(r'<[^<>]+?>', r'', entry['title'])
+        text = html.unescape(text)
+        labelvar.set(text)
 
         global currentURL
         currentURL = entry['link']
