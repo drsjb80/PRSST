@@ -3,6 +3,13 @@
 # PRSST
 A simple Python RSS/Atom ticker, similar to JRSST.
 
+## Installation
+You'll need Python3 tkinter: https://stackoverflow.com/a/25905642
+
+You'll also need to install three Python3 packages via:
+
+    python3 -m pip install -r requirements.txt
+
 ### Arguments
 - --feed or -f : specify one or more feed(s) directly
 - --yaml or -y : specify one or more yaml file(s); these can contain font etc. information in addition to feeds.
