@@ -20,4 +20,6 @@ If neither are found, PRSST looks for a .prsst.yml file in your home directory.
 feeds:
     - https://us-cert.cisa.gov/ncas/all.xml
 font: Helvetica 14 normal roman
+growright: False
+delay: 10
 ```

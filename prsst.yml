@@ -1,4 +1,6 @@
+delay: 10
 feeds:
+- https://www.fedscoop.com/feed
 - https://portswigger.net/daily-swig/rss
 - https://rssfeeds.9news.com/kusa/home
 - http://feeds.denverpost.com/dp-news-breaking
@@ -25,10 +27,11 @@ feeds:
 - https://www.fedscoop.com/feed
 - https://isc.sans.edu/rssfeed.xml
 - https://feeds2.feedburner.com/inkophile
-- https://www.darkreading.com/rss/all.xml
 - https://googleprojectzero.blogspot.com/feeds/posts/default
 - https://www.wnyc.org/feeds/people/shankar-vedantam
 - https://www.penaddict.com/blog?format=rss
 - https://tidbits.com/feeds/tidbits_blurb.rss
 - https://www.reddit.com/r/todayilearned.rss
-font: Helvetica 14 normal roman
+font: FreeSans 10 normal italic
+growright: false
+reload: 120

@@ -18,9 +18,15 @@ class Object:
 
 currentURL = ''
 global_queue = None
+
 root = tkinter.Tk()
+# https://stackoverflow.com/a/15463496
+default_font = tkinter.font.nametofont("TkDefaultFont")
+root.option_add("*Font", default_font)
+
 labelvar = tkinter.StringVar()
 label = tkinter.ttk.Label(root, textvariable=labelvar)
+
 growright = False
 config = {}
 
@@ -38,7 +44,7 @@ def openbrowser(event):
     webbrowser.open(currentURL)
 
 def initialize():
-    root.title('DRSST')
+    root.title('PRSST')
     labelvar.set('Initializing')
 
     tkinter.ttk.Style().configure("TLabel", padding=4)
@@ -54,6 +60,8 @@ def initialize():
 def setdefaults():
     if 'font' in config:
         label.configure(font=config['font'])
+        size = config['font'].split()
+        default_font.configure(size=size[1])
     if 'feeds' not in config:
         config['feeds'] = ['http://feeds.rssboard.org/rssboard']
     if 'growright' not in config:
@@ -91,6 +99,11 @@ def setfont():
         label.configure(font=font_str)
         config['font'] = font_str
 
+        default_font.configure(family=font_str.split()[0])
+        default_font.configure(size=font_str.split()[1])
+        default_font.configure(weight=font_str.split()[2])
+        default_font.configure(slant=font_str.split()[3])
+
         with open('prsst.yml', 'w') as afile:
             yaml.dump(config, afile)
 
@@ -101,7 +114,10 @@ class FetchThread(threading.Thread):
 
     def run(self):
         afeed = feedparser.parse(self.url)
-        if afeed.feed is None or afeed.feed.title is None:
+        try:
+            afeed.feed
+            afeed.feed.title
+        except:
             print('error fetching feed', self.url)
             afeed.feed.title = 'Error'
             # this is a hack so i don't have to create objects
