@@ -1,3 +1,4 @@
+''' A simple RSS/ATOM ticker. '''
 import argparse
 import tkinter
 import time
@@ -11,90 +12,89 @@ import feedparser
 import yaml
 from tkfontchooser import askfont
 
-# https://programmingideaswithjake.wordpress.com/2016/05/07/object-literals-in-python/
-class Object:
-    def __init__(self, **attributes):
-        self.__dict__.update(attributes)
 
-currentURL = ''
-global_queue = None
+CURRENT_URL = ''
+GLOBAL_QUEUE = None
 
-root = tkinter.Tk()
+ROOT = tkinter.Tk()
 # https://stackoverflow.com/a/15463496
-default_font = tkinter.font.nametofont("TkDefaultFont")
-root.option_add("*Font", default_font)
+DEFAULT_FONT = tkinter.font.nametofont("TkDefaultFont")
+ROOT.option_add("*Font", DEFAULT_FONT)
 
-labelvar = tkinter.StringVar()
-label = tkinter.ttk.Label(root, textvariable=labelvar)
+LABELVAR = tkinter.StringVar()
+LABEL = tkinter.ttk.Label(ROOT, textvariable=LABELVAR)
 
-growright = False
-config = {}
+CONFIG = {}
 
 TITLE_KEY = "i'm a title"
 
-parser = argparse.ArgumentParser()
-parser.add_argument('-f', '--feed', help="specify feed directly", \
-    action='append')
-parser.add_argument('-y', '--yaml', help="specify YAML file", \
-    action='append')
-args = parser.parse_args()
+PARSER = argparse.ArgumentParser()
+PARSER.add_argument('-f', '--feed', help="specify feed directly", action='append')
+PARSER.add_argument('-y', '--yaml', help="specify YAML file", action='append')
+ARGS = PARSER.parse_args()
 
 # make into a lambda
 def openbrowser(event):
-    webbrowser.open(currentURL)
+    """ Look at global (bleah) and open browser. """
+    webbrowser.open(CURRENT_URL)
 
 def initialize():
-    root.title('PRSST')
-    labelvar.set('Initializing')
+    """ Get everything the way it needs to be. Not sure how much should be
+    here and how much above. """
+    ROOT.title('PRSST')
+    LABELVAR.set('Initializing')
 
     tkinter.ttk.Style().configure("TLabel", padding=4)
-    label.bind("<Button-1>", openbrowser)
-    label.pack()
+    LABEL.bind("<Button-1>", openbrowser)
+    LABEL.pack()
 
-    menubar = tkinter.Menu(root)
+    menubar = tkinter.Menu(ROOT)
     settings = tkinter.Menu(menubar, tearoff=0)
-    settings.add_command(label="Font", command=setfont)
+    settings.add_command(label="Font", command=set_font)
     menubar.add_cascade(label="Settings", menu=settings)
-    root.config(menu=menubar)
+    ROOT.config(menu=menubar)
 
 def set_font_info(info):
+    """ Yeah, what it says. """
     font_info = info.split()
-    default_font.configure(family=font_info[0])
-    default_font.configure(size=font_info[1])
-    default_font.configure(weight=font_info[2])
-    default_font.configure(slant=font_info[3])
+    DEFAULT_FONT.configure(family=font_info[0])
+    DEFAULT_FONT.configure(size=font_info[1])
+    DEFAULT_FONT.configure(weight=font_info[2])
+    DEFAULT_FONT.configure(slant=font_info[3])
 
-def setdefaults():
-    if 'font' in config:
-        label.configure(font=config['font'])
-        set_font_info(config['font'])
-    if 'feeds' not in config:
-        config['feeds'] = ['http://feeds.rssboard.org/rssboard']
-    if 'growright' not in config:
-        config['growright'] = False
-    if 'delay' not in config:
-        config['delay'] = 10
-    if 'reload' not in config:
-        config['reload'] = 120
+def set_defaults():
+    """ Yeah, what it says. """
+    if 'font' in CONFIG:
+        LABEL.configure(font=CONFIG['font'])
+        set_font_info(CONFIG['font'])
+    if 'feeds' not in CONFIG:
+        CONFIG['feeds'] = ['http://feeds.rssboard.org/rssboard']
+    if 'growright' not in CONFIG:
+        CONFIG['growright'] = False
+    if 'delay' not in CONFIG:
+        CONFIG['delay'] = 10
+    if 'reload' not in CONFIG:
+        CONFIG['reload'] = 120
 
-def readconfig():
-    if args.feed:
-        config['feeds'] = args.feed
+def read_config():
+    """ Yeah, what it says. """
+    if ARGS.feed:
+        CONFIG['feeds'] = ARGS.feed
 
-    if args.yaml:
-        for ayaml in args.yaml:
+    if ARGS.yaml:
+        for ayaml in ARGS.yaml:
             with Path(ayaml).open() as afile:
-                config.update(yaml.safe_load(afile))
+                CONFIG.update(yaml.safe_load(afile))
 
-    if args.feed is None and args.yaml is None:
+    if ARGS.feed is None and ARGS.yaml is None:
         with Path(str(Path.home()) + '/.prsst.yml').open() as afile:
-            config.update(yaml.safe_load(afile))
+            CONFIG.update(yaml.safe_load(afile))
 
-    setdefaults()
-    return config
+    set_defaults()
 
-def setfont():
-    font = askfont(root)
+def set_font():
+    """ Called via the menu. """
+    font = askfont(ROOT)
     if font:
         font['family'] = font['family'].replace(' ', '\ ')
         font_str = "%(family)s %(size)i %(weight)s %(slant)s" % font
@@ -102,19 +102,26 @@ def setfont():
             font_str += ' underline'
         if font['overstrike']:
             font_str += ' overstrike'
-        label.configure(font=font_str)
-        config['font'] = font_str
+        LABEL.configure(font=font_str)
+        CONFIG['font'] = font_str
         set_font_info(font_str)
 
         with open('prsst.yml', 'w') as afile:
-            yaml.dump(config, afile)
+            yaml.dump(CONFIG, afile)
+
+# https://programmingideaswithjake.wordpress.com/2016/05/07/object-literals-in-python/
+class Object:
+    def __init__(self, **attributes):
+        self.__dict__.update(attributes)
 
 class FetchThread(threading.Thread):
+    """ A thread to fetch a URL. """
     def __init__(self, url):
         super().__init__()
         self.url = url
 
     def run(self):
+        """ Read the URL passed in. """
         afeed = feedparser.parse(self.url)
         try:
             afeed.feed
@@ -128,77 +135,80 @@ class FetchThread(threading.Thread):
 
         # get everything in safely so there's no interleaving
         with threading.Lock():
-            global_queue.put({TITLE_KEY:afeed.feed.title})
+            GLOBAL_QUEUE.put({TITLE_KEY:afeed.feed.title})
             for entry in afeed.entries:
-                global_queue.put(entry)
+                GLOBAL_QUEUE.put(entry)
 
 class Reload(threading.Thread):
+    """ One thread to call a FetchThread for each URL. """
     def __init__(self):
         super().__init__()
 
     def run(self):
         while True:
-            global global_queue
+            global GLOBAL_QUEUE
 
             # the second and subsequent times
-            if global_queue is not None:
-                config['reload'] = (config['delay'] * global_queue.qsize() / 60) + 2
+            if GLOBAL_QUEUE is not None:
+                CONFIG['reload'] = (CONFIG['delay'] * GLOBAL_QUEUE.qsize() / 60) + 2
 
             with threading.Lock():
-                global_queue = queue.SimpleQueue()
-                for feed in config['feeds']:
+                GLOBAL_QUEUE = queue.SimpleQueue()
+                for feed in CONFIG['feeds']:
                     fetch_thread = FetchThread(feed)
                     fetch_thread.daemon = True
                     fetch_thread.start()
 
-            time.sleep(config['reload'] * 60)
+            time.sleep(CONFIG['reload'] * 60)
 
 # bleah
 # https://stackoverflow.com/questions/26703502/threads-and-tkinter
 def infinite_process():
+    """ Recursive to loop, but it doesn't seem to grow the stack. """
     while True:
         with threading.Lock():
-            entry = global_queue.get()
-            global_queue.put(entry)
+            entry = GLOBAL_QUEUE.get()
+            GLOBAL_QUEUE.put(entry)
 
         # find a better way to do this.
         if TITLE_KEY in entry.keys():
-            root.title(html.unescape(entry[TITLE_KEY]))
-            root.update()
+            ROOT.title(html.unescape(entry[TITLE_KEY]))
+            ROOT.update()
             continue
 
         # use dictionary syntax so error messages are easily created
         text = re.sub(r'<[^<>]+?>', r'', entry['title'])
         text = html.unescape(text)
-        labelvar.set(text)
+        LABELVAR.set(text)
 
-        global currentURL
-        currentURL = entry['link']
+        global CURRENT_URL
+        CURRENT_URL = entry['link']
 
-        if growright:
+# https://stackoverflow.com/questions/47127585/tkinter-grow-frame-to-fit-content
+        if CONFIG['growright']:
             # not my favorite approach but i don't yet know how to grow
             # a frame to the left.
-            ex = root.winfo_screenwidth() - root.winfo_width()
-            why = root.winfo_screenheight() - root.winfo_height()
-            # notsure = root.wm_geometry().split('+') 23 works for
+            ex = ROOT.winfo_screenwidth() - ROOT.winfo_width()
+            why = ROOT.winfo_screenheight() - ROOT.winfo_height()
+            # notsure = ROOT.wm_geometry().split('+') 23 works for
             # OSX...
-            root.geometry('+%d+%d' % (ex, why-23))
+            ROOT.geometry('+%d+%d' % (ex, why-23))
 
-        root.update()
+        ROOT.update()
 
         break
 
     # it appears this doesn't increase the stack size...
-    root.after(config['delay'] * 1000, infinite_process)
+    ROOT.after(CONFIG['delay'] * 1000, infinite_process)
 
 initialize()
-readconfig()
+read_config()
 
-mainThread = Reload()
-mainThread.daemon = True
-mainThread.start()
+MAINTHREAD = Reload()
+MAINTHREAD.daemon = True
+MAINTHREAD.start()
 
-root.after(1, infinite_process)
-root.mainloop()
+ROOT.after(1, infinite_process)
+ROOT.mainloop()
 
-# https://stackoverflow.com/questions/47127585/tkinter-grow-frame-to-fit-content
+# vim: wm=0
