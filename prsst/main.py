@@ -54,19 +54,23 @@ def initialize():
     menubar.add_cascade(label="Settings", menu=settings)
     ROOT.config(menu=menubar)
 
-def set_font_info(info):
-    """ Yeah, what it says. """
-    font_info = info.split()
-    DEFAULT_FONT.configure(family=font_info[0])
-    DEFAULT_FONT.configure(size=font_info[1])
-    DEFAULT_FONT.configure(weight=font_info[2])
-    DEFAULT_FONT.configure(slant=font_info[3])
-
 def set_defaults():
     """ Yeah, what it says. """
-    if 'font' in CONFIG:
-        LABEL.configure(font=CONFIG['font'])
-        set_font_info(CONFIG['font'])
+
+    if 'font-family' in CONFIG:
+        font_str = CONFIG['font-family'] + " " \
+            + str(CONFIG['font-size']) + " " \
+            + CONFIG['font-weight'] + " " \
+            + CONFIG['font-slant']
+        LABEL.configure(font=font_str)
+        DEFAULT_FONT.configure(family=CONFIG['font-family'])
+    if 'font-size' in CONFIG:
+        DEFAULT_FONT.configure(size=CONFIG['font-size'])
+    if 'font-weight' in CONFIG:
+        DEFAULT_FONT.configure(weight=CONFIG['font-weight'])
+    if 'font-slant' in CONFIG:
+        DEFAULT_FONT.configure(slant=CONFIG['font-slant'])
+
     if 'feeds' not in CONFIG:
         CONFIG['feeds'] = ['https://www.nasa.gov/rss/dyn/lg_image_of_the_day.rss']
     if 'growright' not in CONFIG:
@@ -92,10 +96,20 @@ def read_config():
 
     set_defaults()
 
+def save_config():
+    home_yml = Path(str(Path.home()) + '/.prsst.yml')
+    if home_yml.exists() and home_yml.is_file():
+        with open(str(home_yml), 'w') as afile:
+            yaml.dump(CONFIG, afile)
+    else:
+        with open('prsst.yml', 'w') as afile:
+            yaml.dump(CONFIG, afile)
+
 def set_font():
     """ Called via the menu. """
     font = askfont(ROOT)
     if font:
+        font_family = font['family']
         font['family'] = font['family'].replace(' ', '\ ')
         font_str = "%(family)s %(size)i %(weight)s %(slant)s" % font
         if font['underline']:
@@ -103,11 +117,20 @@ def set_font():
         if font['overstrike']:
             font_str += ' overstrike'
         LABEL.configure(font=font_str)
-        CONFIG['font'] = font_str
-        set_font_info(font_str)
 
-        with open('prsst.yml', 'w') as afile:
-            yaml.dump(CONFIG, afile)
+        # overstrike and underline?
+        DEFAULT_FONT.configure(family=font_family)
+        DEFAULT_FONT.configure(size=font['size'])
+        DEFAULT_FONT.configure(weight=font['weight'])
+        DEFAULT_FONT.configure(slant=font['slant'])
+
+        # overstrike and underline?
+        CONFIG['font-family'] = font_family
+        CONFIG['font-size'] = font['size']
+        CONFIG['font-weight'] = font['weight']
+        CONFIG['font-slant'] = font['slant']
+
+        save_config()
 
 # https://programmingideaswithjake.wordpress.com/2016/05/07/object-literals-in-python/
 class Object:
@@ -128,10 +151,7 @@ class FetchThread(threading.Thread):
             afeed.feed.title
         except:
             print('error fetching feed', self.url)
-            afeed.feed.title = 'Error'
-            # this is a hack so i don't have to create objects
-            afeed.entries = [{'title':('Unable to load %s') % self.url, \
-                'link':'https://www.example.com'}]
+            return
 
         # get everything in safely so there's no interleaving
         with threading.Lock():

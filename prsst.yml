@@ -32,6 +32,5 @@ feeds:
 - https://www.penaddict.com/blog?format=rss
 - https://tidbits.com/feeds/tidbits_blurb.rss
 - https://www.reddit.com/r/todayilearned.rss
-font: FreeSans 10 normal italic
 growright: false
 reload: 120
