@@ -57,11 +57,17 @@ def initialize():
     menubar.add_cascade(label="Settings", menu=settings)
     root.config(menu=menubar)
 
+def set_font_info(info):
+    font_info = info.split()
+    default_font.configure(family=font_info[0])
+    default_font.configure(size=font_info[1])
+    default_font.configure(weight=font_info[2])
+    default_font.configure(slant=font_info[3])
+
 def setdefaults():
     if 'font' in config:
         label.configure(font=config['font'])
-        size = config['font'].split()
-        default_font.configure(size=size[1])
+        set_font_info(config['font'])
     if 'feeds' not in config:
         config['feeds'] = ['http://feeds.rssboard.org/rssboard']
     if 'growright' not in config:
@@ -98,11 +104,7 @@ def setfont():
             font_str += ' overstrike'
         label.configure(font=font_str)
         config['font'] = font_str
-
-        default_font.configure(family=font_str.split()[0])
-        default_font.configure(size=font_str.split()[1])
-        default_font.configure(weight=font_str.split()[2])
-        default_font.configure(slant=font_str.split()[3])
+        set_font_info(font_str)
 
         with open('prsst.yml', 'w') as afile:
             yaml.dump(config, afile)
