@@ -68,7 +68,7 @@ def set_defaults():
         LABEL.configure(font=CONFIG['font'])
         set_font_info(CONFIG['font'])
     if 'feeds' not in CONFIG:
-        CONFIG['feeds'] = ['http://feeds.rssboard.org/rssboard']
+        CONFIG['feeds'] = ['https://www.nasa.gov/rss/dyn/lg_image_of_the_day.rss']
     if 'growright' not in CONFIG:
         CONFIG['growright'] = False
     if 'delay' not in CONFIG:

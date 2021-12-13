@@ -1,3 +1,6 @@
+import html
+html.unescape('&#x00e2;&#x0080;&#x009c;')
+
 https://pythonhosted.org/feedparser/
 https://docs.python.org/3.6/library/threading.html
 https://docs.python.org/3/library/tkinter.ttk.html
