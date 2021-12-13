@@ -1,0 +1,2 @@
+python3 prsst/main.py --yaml=prsst.yml
+pylint prsst/main.py
