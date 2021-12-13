@@ -23,3 +23,11 @@ font: Helvetica 14 normal roman
 growright: False
 delay: 10
 ```
+
+If you get the following error on a Linux system:
+
+    X Error of failed request:  BadLength (poly request too large or internal Xlib length error)
+
+it is easiest, though a bit draconian, to remove a color emoji font:
+
+    sudo apt remove fonts-noto-color-emoji
