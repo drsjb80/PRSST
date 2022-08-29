@@ -1,4 +1,5 @@
 ''' A simple RSS/ATOM ticker. '''
+import encodings.idna
 import argparse
 import tkinter
 import time
@@ -8,15 +9,18 @@ import threading
 import html
 import re
 from pathlib import Path
+import logging
 import feedparser
 import yaml
 from tkfontchooser import askfont
 
+# logging.basicConfig(level=logging.DEBUG)
 
 CURRENT_URL = ''
 GLOBAL_QUEUE = None
 
 ROOT = tkinter.Tk()
+# ROOT.overrideredirect(True)
 # https://stackoverflow.com/a/15463496
 DEFAULT_FONT = tkinter.font.nametofont("TkDefaultFont")
 ROOT.option_add("*Font", DEFAULT_FONT)
@@ -145,19 +149,18 @@ class FetchThread(threading.Thread):
 
     def run(self):
         """ Read the URL passed in. """
-        afeed = feedparser.parse(self.url)
+        afeed = None
         try:
+            afeed = feedparser.parse(self.url)
             afeed.feed
             afeed.feed.title
         except:
-            print('error fetching feed', self.url)
+            logging.error(f'error fetching feed {self.url}')
             return
 
-        # get everything in safely so there's no interleaving
-        with threading.Lock():
-            GLOBAL_QUEUE.put({TITLE_KEY:afeed.feed.title})
-            for entry in afeed.entries:
-                GLOBAL_QUEUE.put(entry)
+        GLOBAL_QUEUE.put({TITLE_KEY:afeed.feed.title})
+        for entry in afeed.entries:
+            GLOBAL_QUEUE.put(entry)
 
 class Reload(threading.Thread):
     """ One thread to call a FetchThread for each URL. """
@@ -171,13 +174,14 @@ class Reload(threading.Thread):
             # the second and subsequent times
             if GLOBAL_QUEUE is not None:
                 CONFIG['reload'] = (CONFIG['delay'] * GLOBAL_QUEUE.qsize() / 60) + 2
+                logging.debug(GLOBAL_QUEUE.qsize())
+                logging.debug(CONFIG['reload'])
 
-            with threading.Lock():
-                GLOBAL_QUEUE = queue.SimpleQueue()
-                for feed in CONFIG['feeds']:
-                    fetch_thread = FetchThread(feed)
-                    fetch_thread.daemon = True
-                    fetch_thread.start()
+            GLOBAL_QUEUE = queue.SimpleQueue()
+            for feed in CONFIG['feeds']:
+                fetch_thread = FetchThread(feed)
+                fetch_thread.daemon = True
+                fetch_thread.start()
 
             time.sleep(CONFIG['reload'] * 60)
 
@@ -186,9 +190,8 @@ class Reload(threading.Thread):
 def infinite_process():
     """ Recursive to loop, but it doesn't seem to grow the stack. """
     while True:
-        with threading.Lock():
-            entry = GLOBAL_QUEUE.get()
-            GLOBAL_QUEUE.put(entry)
+        entry = GLOBAL_QUEUE.get()
+        GLOBAL_QUEUE.put(entry)
 
         # find a better way to do this.
         if TITLE_KEY in entry.keys():
