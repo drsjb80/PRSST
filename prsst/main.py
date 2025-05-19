@@ -12,91 +12,93 @@ from pathlib import Path
 import logging
 import feedparser
 import yaml
+import sys
 from tkfontchooser import askfont
 
 # logging.basicConfig(level=logging.DEBUG)
+current_url = ''
+global_queue = None
+config = {}
+args = None
 
-CURRENT_URL = ''
-GLOBAL_QUEUE = None
+root = tkinter.Tk()
+root.overrideredirect(True)
 
-ROOT = tkinter.Tk()
-# ROOT.overrideredirect(True)
 # https://stackoverflow.com/a/15463496
-DEFAULT_FONT = tkinter.font.nametofont("TkDefaultFont")
-ROOT.option_add("*Font", DEFAULT_FONT)
+root.option_add("*Font", tkinter.font.nametofont("TkDefaultFont"))
 
-LABELVAR = tkinter.StringVar()
-LABEL = tkinter.ttk.Label(ROOT, textvariable=LABELVAR)
+labelvar = tkinter.StringVar()
+label = tkinter.ttk.Label(root, textvariable=labelvar)
 
-CONFIG = {}
-
-TITLE_KEY = "i'm a title"
-
-PARSER = argparse.ArgumentParser()
-PARSER.add_argument('-f', '--feed', help="specify feed directly", action='append')
-PARSER.add_argument('-y', '--yaml', help="specify YAML file", action='append')
-ARGS = PARSER.parse_args()
+title_key = "i'm a title"
 
 # make into a lambda
 def openbrowser(event):
     """ Look at global (bleah) and open browser. """
-    webbrowser.open(CURRENT_URL)
+    webbrowser.open(current_url)
 
 def initialize():
     """ Get everything the way it needs to be. Not sure how much should be
     here and how much above. """
-    ROOT.title('PRSST')
-    LABELVAR.set('Initializing')
+    root.title('PRSST')
+    labelvar.set('Initializing')
 
     tkinter.ttk.Style().configure("TLabel", padding=4)
-    LABEL.bind("<Button-1>", openbrowser)
-    LABEL.pack()
+    label.bind("<Button-1>", openbrowser)
+    label.pack()
 
-    menubar = tkinter.Menu(ROOT)
+    menubar = tkinter.Menu(root)
     settings = tkinter.Menu(menubar, tearoff=0)
     settings.add_command(label="Font", command=set_font)
     menubar.add_cascade(label="Settings", menu=settings)
-    ROOT.config(menu=menubar)
+    root.config(menu=menubar)
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-f', '--feed', help="specify feed directly", action='append')
+    parser.add_argument('-y', '--yaml', help="specify YAML file", action='append')
+
+    global args
+    args = parser.parse_args()
 
 def set_defaults():
     """ Yeah, what it says. """
 
-    if 'font-family' in CONFIG:
-        font_str = CONFIG['font-family'] + " " \
-            + str(CONFIG['font-size']) + " " \
-            + CONFIG['font-weight'] + " " \
-            + CONFIG['font-slant']
-        LABEL.configure(font=font_str)
-        DEFAULT_FONT.configure(family=CONFIG['font-family'])
-    if 'font-size' in CONFIG:
-        DEFAULT_FONT.configure(size=CONFIG['font-size'])
-    if 'font-weight' in CONFIG:
-        DEFAULT_FONT.configure(weight=CONFIG['font-weight'])
-    if 'font-slant' in CONFIG:
-        DEFAULT_FONT.configure(slant=CONFIG['font-slant'])
+    if 'font-family' in config:
+        font_str = config['font-family'] + " " \
+            + str(config['font-size']) + " " \
+            + config['font-weight'] + " " \
+            + config['font-slant']
+        label.configure(font=font_str)
+        default_font.configure(family=config['font-family'])
+    if 'font-size' in config:
+        default_font.configure(size=config['font-size'])
+    if 'font-weight' in config:
+        default_font.configure(weight=config['font-weight'])
+    if 'font-slant' in config:
+        default_font.configure(slant=config['font-slant'])
 
-    if 'feeds' not in CONFIG:
-        CONFIG['feeds'] = ['https://www.nasa.gov/rss/dyn/lg_image_of_the_day.rss']
-    if 'growright' not in CONFIG:
-        CONFIG['growright'] = False
-    if 'delay' not in CONFIG:
-        CONFIG['delay'] = 10
-    if 'reload' not in CONFIG:
-        CONFIG['reload'] = 120
+    if 'feeds' not in config:
+        config['feeds'] = ['https://www.nasa.gov/rss/dyn/lg_image_of_the_day.rss']
+    if 'growright' not in config:
+        config['growright'] = False
+    if 'delay' not in config:
+        config['delay'] = 10
+    if 'reload' not in config:
+        config['reload'] = 120
 
 def read_config():
     """ Yeah, what it says. """
-    if ARGS.feed:
-        CONFIG['feeds'] = ARGS.feed
+    if args.feed:
+        config['feeds'] = args.feed
 
-    if ARGS.yaml:
-        for ayaml in ARGS.yaml:
+    if args.yaml:
+        for ayaml in args.yaml:
             with Path(ayaml).open() as afile:
-                CONFIG.update(yaml.safe_load(afile))
+                config.update(yaml.safe_load(afile))
 
-    if ARGS.feed is None and ARGS.yaml is None:
+    if args.feed is None and args.yaml is None:
         with Path(str(Path.home()) + '/.prsst.yml').open() as afile:
-            CONFIG.update(yaml.safe_load(afile))
+            config.update(yaml.safe_load(afile))
 
     set_defaults()
 
@@ -104,42 +106,36 @@ def save_config():
     home_yml = Path(str(Path.home()) + '/.prsst.yml')
     if home_yml.exists() and home_yml.is_file():
         with open(str(home_yml), 'w') as afile:
-            yaml.dump(CONFIG, afile)
+            yaml.dump(config, afile)
     else:
         with open('prsst.yml', 'w') as afile:
-            yaml.dump(CONFIG, afile)
+            yaml.dump(config, afile)
 
 def set_font():
     """ Called via the menu. """
-    font = askfont(ROOT)
+    font = askfont(root)
     if font:
         font_family = font['family']
-        font['family'] = font['family'].replace(' ', '\ ')
+        font['family'] = font['family'].replace(' ', '\\ ')
         font_str = "%(family)s %(size)i %(weight)s %(slant)s" % font
         if font['underline']:
             font_str += ' underline'
         if font['overstrike']:
             font_str += ' overstrike'
-        LABEL.configure(font=font_str)
+        label.configure(font=font_str)
 
         # overstrike and underline?
-        DEFAULT_FONT.configure(family=font_family)
-        DEFAULT_FONT.configure(size=font['size'])
-        DEFAULT_FONT.configure(weight=font['weight'])
-        DEFAULT_FONT.configure(slant=font['slant'])
+        default_font.configure(family=font_family)
+        default_font.configure(size=font['size'])
+        default_font.configure(weight=font['weight'])
+        default_font.configure(slant=font['slant'])
 
-        # overstrike and underline?
-        CONFIG['font-family'] = font_family
-        CONFIG['font-size'] = font['size']
-        CONFIG['font-weight'] = font['weight']
-        CONFIG['font-slant'] = font['slant']
+        config['font-family'] = font_family
+        config['font-size'] = font['size']
+        config['font-weight'] = font['weight']
+        config['font-slant'] = font['slant']
 
         save_config()
-
-# https://programmingideaswithjake.wordpress.com/2016/05/07/object-literals-in-python/
-class Object:
-    def __init__(self, **attributes):
-        self.__dict__.update(attributes)
 
 class FetchThread(threading.Thread):
     """ A thread to fetch a URL. """
@@ -158,9 +154,9 @@ class FetchThread(threading.Thread):
             logging.error(f'error fetching feed {self.url}')
             return
 
-        GLOBAL_QUEUE.put({TITLE_KEY:afeed.feed.title})
+        global_queue.put({title_key:afeed.feed.title})
         for entry in afeed.entries:
-            GLOBAL_QUEUE.put(entry)
+            global_queue.put(entry)
 
 class Reload(threading.Thread):
     """ One thread to call a FetchThread for each URL. """
@@ -169,69 +165,80 @@ class Reload(threading.Thread):
 
     def run(self):
         while True:
-            global GLOBAL_QUEUE
+            global global_queue
 
             # the second and subsequent times
-            if GLOBAL_QUEUE is not None:
-                CONFIG['reload'] = (CONFIG['delay'] * GLOBAL_QUEUE.qsize() / 60) + 2
-                logging.debug(GLOBAL_QUEUE.qsize())
-                logging.debug(CONFIG['reload'])
+            if global_queue is not None:
+                config['reload'] = (config['delay'] * global_queue.qsize() / 60) + 2
+                logging.debug(global_queue.qsize())
+                logging.debug(config['reload'])
 
-            GLOBAL_QUEUE = queue.SimpleQueue()
-            for feed in CONFIG['feeds']:
+            global_queue = queue.SimpleQueue()
+            for feed in config['feeds']:
                 fetch_thread = FetchThread(feed)
                 fetch_thread.daemon = True
                 fetch_thread.start()
 
-            time.sleep(CONFIG['reload'] * 60)
+            time.sleep(config['reload'] * 60)
 
 # bleah
 # https://stackoverflow.com/questions/26703502/threads-and-tkinter
 def infinite_process():
-    """ Recursive to loop, but it doesn't seem to grow the stack. """
+    """ Recursive to loop, but it doesn't seem to grow the stack, see tail recursion. """
     while True:
-        entry = GLOBAL_QUEUE.get()
-        GLOBAL_QUEUE.put(entry)
+        entry = global_queue.get()
+        global_queue.put(entry)
 
         # find a better way to do this.
-        if TITLE_KEY in entry.keys():
-            ROOT.title(html.unescape(entry[TITLE_KEY]))
-            ROOT.update()
+        if title_key in entry.keys():
+            root.title(html.unescape(entry[title_key]))
+            root.update()
             continue
 
         # use dictionary syntax so error messages are easily created
         text = re.sub(r'<[^<>]+?>', r'', entry['title'])
         text = html.unescape(text)
-        LABELVAR.set(text)
+        labelvar.set(text)
 
-        global CURRENT_URL
-        CURRENT_URL = entry['link']
+        global current_url
+        current_url = entry['link']
 
 # https://stackoverflow.com/questions/47127585/tkinter-grow-frame-to-fit-content
-        if CONFIG['growright']:
+        if config['growright']:
             # not my favorite approach but i don't yet know how to grow
             # a frame to the left.
-            ex = ROOT.winfo_screenwidth() - ROOT.winfo_width()
-            why = ROOT.winfo_screenheight() - ROOT.winfo_height()
-            # notsure = ROOT.wm_geometry().split('+') 23 works for
+            ex = root.winfo_screenwidth() - root.winfo_width()
+            why = root.winfo_screenheight() - root.winfo_height()
+            # notsure = root.wm_geometry().split('+') 23 works for
             # OSX...
-            ROOT.geometry('+%d+%d' % (ex, why-23))
+            root.geometry('+%d+%d' % (ex, why-23))
 
-        ROOT.update()
-
+        root.update()
         break
 
-    # it appears this doesn't increase the stack size...
-    ROOT.after(CONFIG['delay'] * 1000, infinite_process)
+    root.after(config['delay'] * 1000, infinite_process)
+
+def popup(one):
+    print(one)
+    print('popup')
 
 initialize()
 read_config()
 
-MAINTHREAD = Reload()
-MAINTHREAD.daemon = True
-MAINTHREAD.start()
+# https://stackoverflow.com/questions/16082243/how-to-bind-ctrl-in-python-tkinter
+# https://www.tcl-lang.org/man/tcl8.6/TkCmd/keysyms.htm
+if sys.platform == 'darwin':
+    root.bind("<Control-1>", lambda one: print('popup'))
 
-ROOT.after(1, infinite_process)
-ROOT.mainloop()
+root.bind("<Button-3>", lambda one: print('popup'))
+# root.bind("<Button-3>", popup)
+
+# retrieve the initial list
+mainthread = Reload()
+mainthread.daemon = True
+mainthread.start()
+
+root.after(1, infinite_process)
+root.mainloop()
 
 # vim: wm=0
