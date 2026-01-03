@@ -13,7 +13,9 @@ import logging
 import feedparser
 import yaml
 import sys
+import requests
 from tkfontchooser import askfont
+from io import BytesIO
 
 # logging.basicConfig(level=logging.DEBUG)
 current_url = ''
@@ -51,7 +53,7 @@ def initialize():
     settings = tkinter.Menu(menubar, tearoff=0)
     settings.add_command(label="Font", command=set_font)
     menubar.add_cascade(label="Settings", menu=settings)
-    root.config(menu=menubar)
+    # root.config(menu=menubar)
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-f', '--feed', help="specify feed directly", action='append')
@@ -147,16 +149,30 @@ class FetchThread(threading.Thread):
         """ Read the URL passed in. """
         afeed = None
         try:
-            afeed = feedparser.parse(self.url)
-            afeed.feed
-            afeed.feed.title
+            response = requests.get(self.url, timeout=10)
+            response.raise_for_status() 
+            afeed = feedparser.parse(BytesIO(response.content))
+        except requests.exceptions.Timeout:
+            logging.error(f"The request for {self.url} timed out after 10 seconds.")
+            time.sleep(config['reload'] * 60)
+            return
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Fetching the feed: {e}")
+            time.sleep(config['reload'] * 60)
+            return
         except:
-            logging.error(f'error fetching feed {self.url}')
+            logging.error(f'Fetching feed {self.url}')
+            time.sleep(config['reload'] * 60)
             return
 
-        global_queue.put({title_key:afeed.feed.title})
-        for entry in afeed.entries:
-            global_queue.put(entry)
+        try:
+            global_queue.put({title_key:afeed.feed.title})
+            for entry in afeed.entries:
+                global_queue.put(entry)
+        except AttributeError:
+            logging.error(f'Attribute missing in {self.url}')
+            return
+
 
 class Reload(threading.Thread):
     """ One thread to call a FetchThread for each URL. """
@@ -196,7 +212,14 @@ def infinite_process():
             continue
 
         # use dictionary syntax so error messages are easily created
-        text = re.sub(r'<[^<>]+?>', r'', entry['title'])
+        if 'title' not in entry:
+            text = entry['description']
+            length = 60
+            if len(text) > 60:
+                text = entry['description'][:60] + '...'
+        else:
+            text = re.sub(r'<[^<>]+?>', r'', entry['title'])
+
         text = html.unescape(text)
         labelvar.set(text)
 
