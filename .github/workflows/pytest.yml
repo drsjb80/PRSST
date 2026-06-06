@@ -1,0 +1,12 @@
+name: Pytest
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - run: sudo apt-get install python3-tk
+    - uses: actions/checkout@v3
+    - uses: actions/setup-python@v3
+    - run: pip install -r requirements.txt
+    - run: pip install pytest
+    - run: pytest
