@@ -1,3 +1,4 @@
+[![Pylint](https://github.com/drsjb80/PRSST/actions/workflows/pylint.yml/badge.svg)](https://github.com/drsjb80/PRSST/actions/workflows/pylint.yml)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=drsjb80_PRSST&metric=alert_status)](https://sonarcloud.io/dashboard?id=drsjb80_PRSST)
 
 # PRSST
