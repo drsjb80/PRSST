@@ -22,11 +22,11 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-current_url = ''
-global_queue = None
+CURRENT_URL = ''
+GLOBAL_QUEUE = None
 config = {}
-args = None
-default_font = None
+ARGS = None
+DEFAULT_FONT = None
 
 root = tkinter.Tk()
 root.overrideredirect(True)
@@ -36,14 +36,17 @@ root.option_add("*Font", tkinter.font.nametofont("TkDefaultFont"))
 labelvar = tkinter.StringVar()
 label = tkinter.ttk.Label(root, textvariable=labelvar)
 
-title_key = "i'm a title"
+TITLE_KEY = "i'm a title"
 
 
-def openbrowser(event):
-    webbrowser.open(current_url)
+def openbrowser(_event):
+    """Open the current URL in the default web browser."""
+    webbrowser.open(CURRENT_URL)
 
 
 def initialize():
+    """Initialize the GUI window and parse command-line arguments."""
+    global ARGS  # pylint: disable=global-statement
     root.title('PRSST')
     labelvar.set('Initializing')
 
@@ -60,11 +63,11 @@ def initialize():
     parser.add_argument('-f', '--feed', help="specify feed directly", action='append')
     parser.add_argument('-y', '--yaml', help="specify YAML file", action='append')
 
-    global args
-    args = parser.parse_args()
+    ARGS = parser.parse_args()
 
 
 def validate_config():
+    """Validate the loaded configuration for required and valid values."""
     if 'feeds' not in config or not config['feeds']:
         logging.error("No feeds specified in configuration")
         return False
@@ -88,8 +91,9 @@ def validate_config():
 
 
 def set_defaults():
-    global default_font
-    default_font = tkinter.font.Font(name="TkDefaultFont", exists=True)
+    """Set default configuration values and apply font settings."""
+    global DEFAULT_FONT  # pylint: disable=global-statement
+    DEFAULT_FONT = tkinter.font.Font(name="TkDefaultFont", exists=True)
 
     if 'font-family' in config:
         font_str = config['font-family'] + " " \
@@ -97,13 +101,13 @@ def set_defaults():
             + config['font-weight'] + " " \
             + config['font-slant']
         label.configure(font=font_str)
-        default_font.configure(family=config['font-family'])
+        DEFAULT_FONT.configure(family=config['font-family'])
     if 'font-size' in config:
-        default_font.configure(size=config['font-size'])
+        DEFAULT_FONT.configure(size=config['font-size'])
     if 'font-weight' in config:
-        default_font.configure(weight=config['font-weight'])
+        DEFAULT_FONT.configure(weight=config['font-weight'])
     if 'font-slant' in config:
-        default_font.configure(slant=config['font-slant'])
+        DEFAULT_FONT.configure(slant=config['font-slant'])
 
     if 'feeds' not in config:
         config['feeds'] = ['https://www.nasa.gov/rss/dyn/lg_image_of_the_day.rss']
@@ -116,32 +120,33 @@ def set_defaults():
 
 
 def read_config():
-    if args.feed:
-        config['feeds'] = args.feed
+    """Load configuration from YAML files or command-line arguments."""
+    if ARGS.feed:
+        config['feeds'] = ARGS.feed
 
-    if args.yaml:
-        for ayaml in args.yaml:
+    if ARGS.yaml:
+        for ayaml in ARGS.yaml:
             yaml_path = Path(ayaml)
             if not yaml_path.exists():
-                logging.error(f"YAML file not found: {ayaml}")
+                logging.error("YAML file not found: %s", ayaml)
                 sys.exit(1)
             try:
-                with yaml_path.open() as afile:
+                with yaml_path.open(encoding='utf-8') as afile:
                     config.update(yaml.safe_load(afile))
             except yaml.YAMLError as e:
-                logging.error(f"Invalid YAML in {ayaml}: {e}")
+                logging.error("Invalid YAML in %s: %s", ayaml, e)
                 sys.exit(1)
 
-    if args.feed is None and args.yaml is None:
+    if ARGS.feed is None and ARGS.yaml is None:
         home_yml = Path.home() / '.prsst.yml'
         if not home_yml.exists():
-            logging.error(f"No configuration found. Please create {home_yml} or use -f/--feed")
+            logging.error("No configuration found. Please create %s or use -f/--feed", home_yml)
             sys.exit(1)
         try:
-            with home_yml.open() as afile:
+            with home_yml.open(encoding='utf-8') as afile:
                 config.update(yaml.safe_load(afile))
         except yaml.YAMLError as e:
-            logging.error(f"Invalid YAML in {home_yml}: {e}")
+            logging.error("Invalid YAML in %s: %s", home_yml, e)
             sys.exit(1)
 
     set_defaults()
@@ -151,31 +156,33 @@ def read_config():
 
 
 def save_config():
+    """Save the current configuration to a YAML file."""
     home_yml = Path.home() / '.prsst.yml'
     if home_yml.exists() and home_yml.is_file():
-        with home_yml.open('w') as afile:
+        with home_yml.open('w', encoding='utf-8') as afile:
             yaml.dump(config, afile)
     else:
-        with Path('prsst.yml').open('w') as afile:
+        with Path('prsst.yml').open('w', encoding='utf-8') as afile:
             yaml.dump(config, afile)
 
 
 def set_font():
+    """Open font chooser dialog and update the label font."""
     font = askfont(root)
     if font:
         font_family = font['family']
         font['family'] = font['family'].replace(' ', '\\ ')
-        font_str = "%(family)s %(size)i %(weight)s %(slant)s" % font
+        font_str = f"{font['family']} {font['size']} {font['weight']} {font['slant']}"
         if font['underline']:
             font_str += ' underline'
         if font['overstrike']:
             font_str += ' overstrike'
         label.configure(font=font_str)
 
-        default_font.configure(family=font_family)
-        default_font.configure(size=font['size'])
-        default_font.configure(weight=font['weight'])
-        default_font.configure(slant=font['slant'])
+        DEFAULT_FONT.configure(family=font_family)
+        DEFAULT_FONT.configure(size=font['size'])
+        DEFAULT_FONT.configure(weight=font['weight'])
+        DEFAULT_FONT.configure(slant=font['slant'])
 
         config['font-family'] = font_family
         config['font-size'] = font['size']
@@ -186,60 +193,65 @@ def set_font():
 
 
 class FetchThread(threading.Thread):
+    """Thread for fetching RSS/Atom feeds."""
+
     def __init__(self, url):
         super().__init__()
         self.url = url
 
     def run(self):
+        """Fetch and parse the RSS/Atom feed."""
         afeed = None
         try:
             response = requests.get(self.url, timeout=10)
             response.raise_for_status()
             afeed = feedparser.parse(BytesIO(response.content))
         except requests.exceptions.Timeout:
-            logging.warning(f"Timeout fetching {self.url} (10s)")
+            logging.warning("Timeout fetching %s (10s)", self.url)
             time.sleep(config['reload'] * 60)
             return
         except requests.exceptions.HTTPError as e:
-            logging.warning(f"HTTP error fetching {self.url}: {e.response.status_code}")
+            logging.warning("HTTP error fetching %s: %s", self.url, e.response.status_code)
             time.sleep(config['reload'] * 60)
             return
         except requests.exceptions.RequestException as e:
-            logging.warning(f"Network error fetching {self.url}: {e}")
+            logging.warning("Network error fetching %s: %s", self.url, e)
             time.sleep(config['reload'] * 60)
             return
-        except Exception as e:
-            logging.error(f"Unexpected error fetching {self.url}: {e}")
+        except Exception as e:  # pylint: disable=broad-except
+            logging.error("Unexpected error fetching %s: %s", self.url, e)
             time.sleep(config['reload'] * 60)
             return
 
         try:
             feed_title = getattr(afeed.feed, 'title', 'Untitled Feed')
-            global_queue.put({title_key: feed_title})
+            GLOBAL_QUEUE.put({TITLE_KEY: feed_title})
             if not afeed.entries:
-                logging.info(f"Feed {self.url} has no entries")
+                logging.info("Feed %s has no entries", self.url)
                 return
             for entry in afeed.entries:
-                global_queue.put(entry)
-        except Exception as e:
-            logging.error(f"Error processing feed {self.url}: {e}")
+                GLOBAL_QUEUE.put(entry)
+        except Exception as e:  # pylint: disable=broad-except
+            logging.error("Error processing feed %s: %s", self.url, e)
 
 
 class Reload(threading.Thread):
+    """Thread for reloading feeds at regular intervals."""
+
     def __init__(self):
         super().__init__()
 
     def run(self):
-        while True:
-            global global_queue
+        """Fetch feeds and update the queue."""
+        global GLOBAL_QUEUE  # pylint: disable=global-statement
 
-            # the second and subsequent times
-            if global_queue is not None:
-                config['reload'] = (config['delay'] * global_queue.qsize() / 60) + 2
-                logging.debug(global_queue.qsize())
+        while True:
+            if GLOBAL_QUEUE is not None:
+                config['reload'] = (config['delay'] * GLOBAL_QUEUE.qsize() / 60) + 2
+                logging.debug(GLOBAL_QUEUE.qsize())
                 logging.debug(config['reload'])
 
-            global_queue = queue.SimpleQueue()
+            GLOBAL_QUEUE = queue.SimpleQueue()
             for feed in config['feeds']:
                 fetch_thread = FetchThread(feed)
                 fetch_thread.daemon = True
@@ -249,11 +261,14 @@ class Reload(threading.Thread):
 
 
 def infinite_process():
-    entry = global_queue.get()
-    global_queue.put(entry)
+    """Process the next entry from the queue and update the display."""
+    global CURRENT_URL  # pylint: disable=global-statement
 
-    if title_key in entry.keys():
-        root.title(html.unescape(entry[title_key]))
+    entry = GLOBAL_QUEUE.get()
+    GLOBAL_QUEUE.put(entry)
+
+    if TITLE_KEY in entry.keys():
+        root.title(html.unescape(entry[TITLE_KEY]))
         root.update()
     else:
         text = None
@@ -269,13 +284,12 @@ def infinite_process():
         text = html.unescape(text)
         labelvar.set(text)
 
-        global current_url
-        current_url = entry.get('link', '')
+        CURRENT_URL = entry.get('link', '')
 
         if config['growright']:
             ex = root.winfo_screenwidth() - root.winfo_width()
             why = root.winfo_screenheight() - root.winfo_height()
-            root.geometry('+%d+%d' % (ex, why - 23))
+            root.geometry(f'+{ex}+{why - 23}')
 
         root.update()
 
