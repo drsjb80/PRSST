@@ -1,32 +1,36 @@
 ''' A simple RSS/ATOM ticker. '''
-import encodings.idna
 import argparse
-import tkinter
-import time
-import webbrowser
-import queue
-import threading
 import html
-import re
-from pathlib import Path
 import logging
-import feedparser
-import yaml
+import queue
+import re
 import sys
-import requests
-from tkfontchooser import askfont
+import threading
+import time
+import tkinter
+import webbrowser
 from io import BytesIO
+from pathlib import Path
 
-# logging.basicConfig(level=logging.DEBUG)
+import feedparser
+import requests
+import yaml
+from tkfontchooser import askfont
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+
 current_url = ''
 global_queue = None
 config = {}
 args = None
+default_font = None
 
 root = tkinter.Tk()
 root.overrideredirect(True)
 
-# https://stackoverflow.com/a/15463496
 root.option_add("*Font", tkinter.font.nametofont("TkDefaultFont"))
 
 labelvar = tkinter.StringVar()
@@ -34,14 +38,12 @@ label = tkinter.ttk.Label(root, textvariable=labelvar)
 
 title_key = "i'm a title"
 
-# make into a lambda
+
 def openbrowser(event):
-    """ Look at global (bleah) and open browser. """
     webbrowser.open(current_url)
 
+
 def initialize():
-    """ Get everything the way it needs to be. Not sure how much should be
-    here and how much above. """
     root.title('PRSST')
     labelvar.set('Initializing')
 
@@ -53,7 +55,6 @@ def initialize():
     settings = tkinter.Menu(menubar, tearoff=0)
     settings.add_command(label="Font", command=set_font)
     menubar.add_cascade(label="Settings", menu=settings)
-    # root.config(menu=menubar)
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-f', '--feed', help="specify feed directly", action='append')
@@ -62,8 +63,33 @@ def initialize():
     global args
     args = parser.parse_args()
 
+
+def validate_config():
+    if 'feeds' not in config or not config['feeds']:
+        logging.error("No feeds specified in configuration")
+        return False
+    if not isinstance(config['feeds'], list):
+        logging.error("'feeds' must be a list")
+        return False
+
+    if 'delay' in config and (not isinstance(config['delay'], int) or config['delay'] <= 0):
+        logging.error("'delay' must be a positive integer (milliseconds)")
+        return False
+
+    if 'reload' in config and (not isinstance(config['reload'], int) or config['reload'] <= 0):
+        logging.error("'reload' must be a positive integer (seconds)")
+        return False
+
+    if 'growright' in config and not isinstance(config['growright'], bool):
+        logging.error("'growright' must be a boolean (true/false)")
+        return False
+
+    return True
+
+
 def set_defaults():
-    """ Yeah, what it says. """
+    global default_font
+    default_font = tkinter.font.Font(name="TkDefaultFont", exists=True)
 
     if 'font-family' in config:
         font_str = config['font-family'] + " " \
@@ -88,33 +114,53 @@ def set_defaults():
     if 'reload' not in config:
         config['reload'] = 120
 
+
 def read_config():
-    """ Yeah, what it says. """
     if args.feed:
         config['feeds'] = args.feed
 
     if args.yaml:
         for ayaml in args.yaml:
-            with Path(ayaml).open() as afile:
-                config.update(yaml.safe_load(afile))
+            yaml_path = Path(ayaml)
+            if not yaml_path.exists():
+                logging.error(f"YAML file not found: {ayaml}")
+                sys.exit(1)
+            try:
+                with yaml_path.open() as afile:
+                    config.update(yaml.safe_load(afile))
+            except yaml.YAMLError as e:
+                logging.error(f"Invalid YAML in {ayaml}: {e}")
+                sys.exit(1)
 
     if args.feed is None and args.yaml is None:
-        with Path(str(Path.home()) + '/.prsst.yml').open() as afile:
-            config.update(yaml.safe_load(afile))
+        home_yml = Path.home() / '.prsst.yml'
+        if not home_yml.exists():
+            logging.error(f"No configuration found. Please create {home_yml} or use -f/--feed")
+            sys.exit(1)
+        try:
+            with home_yml.open() as afile:
+                config.update(yaml.safe_load(afile))
+        except yaml.YAMLError as e:
+            logging.error(f"Invalid YAML in {home_yml}: {e}")
+            sys.exit(1)
 
     set_defaults()
 
+    if not validate_config():
+        sys.exit(1)
+
+
 def save_config():
-    home_yml = Path(str(Path.home()) + '/.prsst.yml')
+    home_yml = Path.home() / '.prsst.yml'
     if home_yml.exists() and home_yml.is_file():
-        with open(str(home_yml), 'w') as afile:
+        with home_yml.open('w') as afile:
             yaml.dump(config, afile)
     else:
-        with open('prsst.yml', 'w') as afile:
+        with Path('prsst.yml').open('w') as afile:
             yaml.dump(config, afile)
 
+
 def set_font():
-    """ Called via the menu. """
     font = askfont(root)
     if font:
         font_family = font['family']
@@ -126,7 +172,6 @@ def set_font():
             font_str += ' overstrike'
         label.configure(font=font_str)
 
-        # overstrike and underline?
         default_font.configure(family=font_family)
         default_font.configure(size=font['size'])
         default_font.configure(weight=font['weight'])
@@ -139,43 +184,48 @@ def set_font():
 
         save_config()
 
+
 class FetchThread(threading.Thread):
-    """ A thread to fetch a URL. """
     def __init__(self, url):
         super().__init__()
         self.url = url
 
     def run(self):
-        """ Read the URL passed in. """
         afeed = None
         try:
             response = requests.get(self.url, timeout=10)
-            response.raise_for_status() 
+            response.raise_for_status()
             afeed = feedparser.parse(BytesIO(response.content))
         except requests.exceptions.Timeout:
-            logging.error(f"The request for {self.url} timed out after 10 seconds.")
+            logging.warning(f"Timeout fetching {self.url} (10s)")
+            time.sleep(config['reload'] * 60)
+            return
+        except requests.exceptions.HTTPError as e:
+            logging.warning(f"HTTP error fetching {self.url}: {e.response.status_code}")
             time.sleep(config['reload'] * 60)
             return
         except requests.exceptions.RequestException as e:
-            logging.error(f"Fetching the feed: {e}")
+            logging.warning(f"Network error fetching {self.url}: {e}")
             time.sleep(config['reload'] * 60)
             return
-        except:
-            logging.error(f'Fetching feed {self.url}')
+        except Exception as e:
+            logging.error(f"Unexpected error fetching {self.url}: {e}")
             time.sleep(config['reload'] * 60)
             return
 
         try:
-            global_queue.put({title_key:afeed.feed.title})
+            feed_title = getattr(afeed.feed, 'title', 'Untitled Feed')
+            global_queue.put({title_key: feed_title})
+            if not afeed.entries:
+                logging.info(f"Feed {self.url} has no entries")
+                return
             for entry in afeed.entries:
                 global_queue.put(entry)
-        except AttributeError:
-            logging.error(f'Attribute missing in {self.url}')
-            return
+        except Exception as e:
+            logging.error(f"Error processing feed {self.url}: {e}")
 
 
 class Reload(threading.Thread):
-    """ One thread to call a FetchThread for each URL. """
     def __init__(self):
         super().__init__()
 
@@ -197,71 +247,48 @@ class Reload(threading.Thread):
 
             time.sleep(config['reload'] * 60)
 
-# bleah
-# https://stackoverflow.com/questions/26703502/threads-and-tkinter
+
 def infinite_process():
-    """ Recursive to loop, but it doesn't seem to grow the stack, see tail recursion. """
-    while True:
-        entry = global_queue.get()
-        global_queue.put(entry)
+    entry = global_queue.get()
+    global_queue.put(entry)
 
-        # find a better way to do this.
-        if title_key in entry.keys():
-            root.title(html.unescape(entry[title_key]))
-            root.update()
-            continue
-
-        # use dictionary syntax so error messages are easily created
-        if 'title' not in entry:
-            text = entry['description']
-            length = 60
-            if len(text) > 60:
-                text = entry['description'][:60] + '...'
-        else:
+    if title_key in entry.keys():
+        root.title(html.unescape(entry[title_key]))
+        root.update()
+    else:
+        text = None
+        if 'title' in entry and entry['title']:
             text = re.sub(r'<[^<>]+?>', r'', entry['title'])
+        elif 'description' in entry and entry['description']:
+            text = entry['description']
+            if len(text) > 60:
+                text = text[:60] + '...'
+        else:
+            text = "(No title or description)"
 
         text = html.unescape(text)
         labelvar.set(text)
 
         global current_url
-        current_url = entry['link']
+        current_url = entry.get('link', '')
 
-# https://stackoverflow.com/questions/47127585/tkinter-grow-frame-to-fit-content
         if config['growright']:
-            # not my favorite approach but i don't yet know how to grow
-            # a frame to the left.
             ex = root.winfo_screenwidth() - root.winfo_width()
             why = root.winfo_screenheight() - root.winfo_height()
-            # notsure = root.wm_geometry().split('+') 23 works for
-            # OSX...
-            root.geometry('+%d+%d' % (ex, why-23))
+            root.geometry('+%d+%d' % (ex, why - 23))
 
         root.update()
-        break
 
     root.after(config['delay'] * 1000, infinite_process)
 
-def popup(one):
-    print(one)
-    print('popup')
 
-initialize()
-read_config()
+if '__main__' == __name__:
+    initialize()
+    read_config()
 
-# https://stackoverflow.com/questions/16082243/how-to-bind-ctrl-in-python-tkinter
-# https://www.tcl-lang.org/man/tcl8.6/TkCmd/keysyms.htm
-if sys.platform == 'darwin':
-    root.bind("<Control-1>", lambda one: print('popup'))
+    mainthread = Reload()
+    mainthread.daemon = True
+    mainthread.start()
 
-root.bind("<Button-3>", lambda one: print('popup'))
-# root.bind("<Button-3>", popup)
-
-# retrieve the initial list
-mainthread = Reload()
-mainthread.daemon = True
-mainthread.start()
-
-root.after(1, infinite_process)
-root.mainloop()
-
-# vim: wm=0
+    root.after(1, infinite_process)
+    root.mainloop()
